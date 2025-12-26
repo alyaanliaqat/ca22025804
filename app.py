@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import numpy as np
 import joblib
-import matplotlib.pyplot as plt
 
 Data_ml = joblib.load("data_ml.pkl")
 y_test = joblib.load("y_test.pkl")
@@ -20,11 +20,17 @@ xgb_rmse = joblib.load("xgb_rmse.pkl")
 st.set_page_config(page_title="Energy Analytics Dashboard", layout="wide")
 
 # Load data
-df = Data_ml.copy()
+df = Data_ml.copy()   # your ML-ready dataset
 
-# Sidebar filters
+#Filter by country name
 st.sidebar.header("Filters")
-country = st.sidebar.selectbox("Select Country", ["Ireland", "France", "Germany"])
+
+country = st.sidebar.selectbox(
+    "Select Country",
+    ["Ireland", "France", "Germany"]
+)
+
+# Filter data
 df_filtered = df[df["Geopolitical entity (reporting)"] == country]
 
 # Title
@@ -33,41 +39,65 @@ st.markdown("**Comparative Energy Analysis and Machine Learning Insights**")
 
 # Section 1: Data Distribution
 st.subheader("Energy Consumption Distribution")
-fig, ax = plt.subplots()
-ax.hist(df_filtered["OBS_VALUE"], bins=40, color='skyblue', edgecolor='black')
-ax.set_title(f"{country} Energy Consumption Distribution")
-ax.set_xlabel("Energy Consumption")
-ax.set_ylabel("Frequency")
-st.pyplot(fig)
+
+fig_dist = px.histogram(
+    df_filtered,
+    x="OBS_VALUE",
+    nbins=40,
+    title=f"{country} Energy Consumption Distribution",
+    labels={"OBS_VALUE": "Energy Consumption"}
+)
+
+st.plotly_chart(fig_dist, use_container_width=True)
 
 # Section 2: Time Series Trend
 st.subheader("Energy Consumption Over Time")
-fig, ax = plt.subplots()
-ax.plot(df_filtered["TIME_PERIOD"], df_filtered["OBS_VALUE"], marker='o', linestyle='-')
-ax.set_title(f"{country} Energy Consumption Trend")
-ax.set_xlabel("Year")
-ax.set_ylabel("Energy Consumption")
-plt.xticks(rotation=45)
-st.pyplot(fig)
+
+fig_ts = px.line(
+    df_filtered,
+    x="TIME_PERIOD",
+    y="OBS_VALUE",
+    title=f"{country} Energy Consumption Trend"
+)
+
+st.plotly_chart(fig_ts, use_container_width=True)
 
 # Section 3: Model Performance
 st.subheader("Machine Learning Model Performance")
+
 performance_df = pd.DataFrame({
     "Model": ["Linear Regression", "Random Forest", "XGBoost"],
     "R² Score": [lr_r2, rf_r2, xgb_r2],
     "RMSE": [lr_rmse, rf_rmse, xgb_rmse]
 })
+
 st.dataframe(performance_df, use_container_width=True)
 
 # Section 4: Actual vs Predicted
 st.subheader("Actual vs Predicted Energy Consumption")
-model_choice = st.selectbox("Select Model", ["Random Forest", "XGBoost"])
-y_pred = rf_predictions if model_choice == "Random Forest" else xgb_predictions
 
-fig, ax = plt.subplots()
-ax.scatter(y_test, y_pred, color='blue', alpha=0.6)
-ax.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red', linestyle='--')
-ax.set_title(f"{model_choice}: Actual vs Predicted")
-ax.set_xlabel("Actual Values")
-ax.set_ylabel("Predicted Values")
-st.pyplot(fig)
+model_choice = st.selectbox(
+    "Select Model",
+    ["Random Forest", "XGBoost"]
+)
+
+if model_choice == "Random Forest":
+    y_pred = rf_predictions
+else:
+    y_pred = xgb_predictions
+
+fig_pred = px.scatter(
+    x=y_test,
+    y=y_pred,
+    labels={"x": "Actual Values", "y": "Predicted Values"},
+    title=f"{model_choice}: Actual vs Predicted"
+)
+
+fig_pred.add_shape(
+    type="line",
+    x0=min(y_test), y0=min(y_test),
+    x1=max(y_test), y1=max(y_test),
+    line=dict(dash="dash")
+)
+
+st.plotly_chart(fig_pred, use_container_width=True)
